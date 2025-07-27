@@ -51,9 +51,9 @@
         }
         
         .button {
-            width: 0;
-            padding-bottom: 100%;
-            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%; /* Ensures perfect circle */
             background: var(--neon-dark);
             display: flex;
             justify-content: center;
@@ -64,6 +64,7 @@
             position: relative;
             border: 2px solid var(--neon-red);
             transition: all 0.2s ease;
+            margin: 0 auto; /* Centers the button in grid cell */
         }
         
         .button.active {
@@ -87,10 +88,8 @@
         }
         
         .button-number {
-            position: absolute;
             font-size: 1.5rem;
             color: var(--neon-white);
-            z-index: 2;
         }
         
         .game-info {
