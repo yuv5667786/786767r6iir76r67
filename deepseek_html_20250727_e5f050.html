@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>REFLEX WALL</title>
+    <style>
+        :root {
+            --neon-red: #ff2a6d;
+            --neon-white: #ffffff;
+            --neon-black: #0a0a0a;
+            --neon-dark: #111111;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--neon-black);
+            color: var(--neon-white);
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin: 1rem 0;
+            color: var(--neon-white);
+            text-align: center;
+            text-shadow: 0 0 10px var(--neon-red);
+        }
+        
+        .game-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            width: 90%;
+            max-width: 500px;
+        }
+        
+        .button {
+            width: 0;
+            padding-bottom: 100%;
+            border-radius: 50%;
+            background: var(--neon-dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--neon-white);
+            font-weight: bold;
+            cursor: pointer;
+            position: relative;
+            border: 2px solid var(--neon-red);
+            transition: all 0.2s ease;
+        }
+        
+        .button.active {
+            background: var(--neon-red);
+            box-shadow: 0 0 20px var(--neon-red);
+            animation: pulse 1s infinite;
+        }
+        
+        .button.fade-out {
+            animation: fadeOut 0.5s forwards;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+        
+        @keyframes fadeOut {
+            to { opacity: 0.3; background: var(--neon-dark); box-shadow: none; }
+        }
+        
+        .button-number {
+            position: absolute;
+            font-size: 1.5rem;
+            color: var(--neon-white);
+            z-index: 2;
+        }
+        
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            width: 90%;
+            max-width: 500px;
+            margin: 1rem 0;
+            padding: 1rem;
+            font-size: 1.2rem;
+        }
+        
+        .countdown {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            color: var(--neon-white);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .final-score {
+            text-align: center;
+            font-size: 1.5rem;
+            margin: 1rem 0;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .start-btn {
+            padding: 12px 24px;
+            font-size: 1.2rem;
+            background: var(--neon-red);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>REFLEX WALL</h1>
+    
+    <button class="start-btn" id="start-btn">START GAME</button>
+    
+    <div class="countdown hidden" id="countdown"></div>
+    
+    <div class="game-info hidden" id="game-info">
+        <div>HITS: <span id="hits">0</span></div>
+        <div>MISSES: <span id="misses">0</span></div>
+        <div>TIME: <span id="timer">30</span>s</div>
+    </div>
+    
+    <div class="game-container hidden" id="game-container"></div>
+    
+    <div class="final-score hidden" id="final-score"></div>
+    
+    <script>
+        // Game elements
+        const gameContainer = document.getElementById('game-container');
+        const startBtn = document.getElementById('start-btn');
+        const countdownElement = document.getElementById('countdown');
+        const timerElement = document.getElementById('timer');
+        const hitsElement = document.getElementById('hits');
+        const missesElement = document.getElementById('misses');
+        const gameInfo = document.getElementById('game-info');
+        const finalScoreElement = document.getElementById('final-score');
+        
+        // Game state
+        let activeButtons = [];
+        let hits = 0;
+        let misses = 0;
+        let timer;
+        let decayTimers = {};
+        let timeLeft = 30;
+        let gameActive = false;
+        
+        // Create buttons
+        function createButtons() {
+            gameContainer.innerHTML = '';
+            for (let i = 1; i <= 9; i++) {
+                const button = document.createElement('div');
+                button.className = 'button';
+                
+                const number = document.createElement('div');
+                number.className = 'button-number';
+                number.textContent = i;
+                
+                button.appendChild(number);
+                button.dataset.number = i;
+                button.addEventListener('click', handleButtonClick);
+                gameContainer.appendChild(button);
+            }
+        }
+        
+        // Handle button clicks
+        function handleButtonClick(e) {
+            if (!gameActive) return;
+            
+            const buttonNumber = parseInt(e.currentTarget.dataset.number);
+            const buttonElement = e.currentTarget;
+            
+            if (buttonElement.classList.contains('active')) {
+                // Correct hit
+                hits++;
+                hitsElement.textContent = hits;
+                
+                // Remove from active buttons
+                const index = activeButtons.indexOf(buttonNumber);
+                if (index !== -1) activeButtons.splice(index, 1);
+                
+                // Clear decay timer
+                if (decayTimers[buttonNumber]) {
+                    clearTimeout(decayTimers[buttonNumber]);
+                    delete decayTimers[buttonNumber];
+                }
+                
+                // Visual feedback
+                buttonElement.classList.remove('active');
+                buttonElement.style.transform = 'scale(0.95)';
+                setTimeout(() => { buttonElement.style.transform = 'scale(1)'; }, 100);
+                
+                // Spawn new button if none left
+                if (activeButtons.length === 0) {
+                    setTimeout(lightUpButton, 500);
+                }
+            }
+        }
+        
+        // Light up a single button (with decay)
+        function lightUpButton() {
+            if (!gameActive) return;
+            
+            // Pick a random button (not already active)
+            const availableButtons = Array.from({length: 9}, (_, i) => i + 1)
+                .filter(num => !activeButtons.includes(num));
+            
+            if (availableButtons.length === 0) return;
+            
+            const randomIndex = Math.floor(Math.random() * availableButtons.length);
+            const selectedButton = availableButtons[randomIndex];
+            activeButtons.push(selectedButton);
+            
+            const buttonElement = document.querySelector(`.button[data-number="${selectedButton}"]`);
+            buttonElement.classList.add('active');
+            
+            // Button decays after 1.5 seconds (counts as a miss)
+            decayTimers[selectedButton] = setTimeout(() => {
+                if (buttonElement.classList.contains('active')) {
+                    buttonElement.classList.add('fade-out');
+                    misses++;
+                    missesElement.textContent = misses;
+                    
+                    // Remove from active buttons
+                    const index = activeButtons.indexOf(selectedButton);
+                    if (index !== -1) activeButtons.splice(index, 1);
+                    
+                    setTimeout(() => {
+                        buttonElement.classList.remove('active', 'fade-out');
+                        lightUpButton(); // Spawn a new one
+                    }, 500);
+                }
+            }, 1500);
+        }
+        
+        // Start game
+        function startGame() {
+            hits = 0;
+            misses = 0;
+            timeLeft = 30;
+            gameActive = false;
+            
+            startBtn.classList.add('hidden');
+            gameContainer.classList.remove('hidden');
+            gameInfo.classList.remove('hidden');
+            
+            hitsElement.textContent = '0';
+            missesElement.textContent = '0';
+            timerElement.textContent = '30';
+            
+            createButtons();
+            
+            // Countdown
+            let count = 3;
+            countdownElement.textContent = count;
+            countdownElement.classList.remove('hidden');
+            
+            const countdownInterval = setInterval(() => {
+                count--;
+                countdownElement.textContent = count > 0 ? count : 'GO!';
+                
+                if (count <= 0) {
+                    clearInterval(countdownInterval);
+                    setTimeout(() => {
+                        countdownElement.classList.add('hidden');
+                        gameActive = true;
+                        startGameTimer();
+                        lightUpButton(); // Start the first button
+                    }, 500);
+                }
+            }, 1000);
+        }
+        
+        // Game timer
+        function startGameTimer() {
+            timer = setInterval(() => {
+                timeLeft--;
+                timerElement.textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    endGame();
+                }
+            }, 1000);
+        }
+        
+        // End game
+        function endGame() {
+            gameActive = false;
+            
+            // Clear all timers
+            Object.values(decayTimers).forEach(timer => clearTimeout(timer));
+            decayTimers = {};
+            
+            // Show final score
+            finalScoreElement.textContent = `HITS: ${hits} | MISSES: ${misses}`;
+            finalScoreElement.classList.remove('hidden');
+            
+            // Return to start after delay
+            setTimeout(() => {
+                gameContainer.classList.add('hidden');
+                gameInfo.classList.add('hidden');
+                finalScoreElement.classList.add('hidden');
+                startBtn.classList.remove('hidden');
+            }, 3000);
+        }
+        
+        // Start button
+        startBtn.addEventListener('click', startGame);
+    </script>
+</body>
+</html>
